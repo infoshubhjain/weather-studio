@@ -15,3 +15,4 @@ shot-*.png
 # Local MCP wiring (machine-specific absolute paths)
 .mcp.json
 .vercel
+.env*

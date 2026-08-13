@@ -1,0 +1,182 @@
+/* Responsive strategy, in one place:
+   - fluid type/spacing with clamp() so nothing needs a breakpoint to look right
+   - auto-fit/minmax grids: cards reflow from 5-up to 1-up with zero media queries
+   - a small number of real breakpoints only where layout *structure* changes
+   - CSS custom properties for theming + prefers-color-scheme for dark mode      */
+
+:root {
+  --bg: #eef3fb;
+  --panel: #ffffff;
+  --panel-2: #f6f8fc;
+  --text: #10192b;
+  --muted: #5b667d;
+  --line: #d9e1ee;
+  --accent: #2563eb;
+  --accent-soft: #dbe6ff;
+  --danger: #dc2626;
+  --ok: #059669;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(16, 25, 43, .06), 0 8px 24px rgba(16, 25, 43, .06);
+  --gap: clamp(.75rem, 1.5vw, 1.25rem);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --panel: #141c2e;
+    --panel-2: #1b2438;
+    --text: #e8eefc;
+    --muted: #97a3bb;
+    --line: #2a3550;
+    --accent: #6ea0ff;
+    --accent-soft: #1e2b4a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+h1 { font-size: clamp(1.4rem, 3.4vw, 2.1rem); margin: 0; letter-spacing: -.02em; }
+h2 { font-size: clamp(1.05rem, 2vw, 1.3rem); margin: 0 0 .75rem; }
+h3 { font-size: 1rem; margin: 0 0 .5rem; }
+p  { margin: 0 0 .6rem; }
+a  { color: var(--accent); }
+
+.muted { color: var(--muted); font-size: .875rem; }
+.row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.spread { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+
+header.top { margin-bottom: var(--gap); }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: clamp(.9rem, 2vw, 1.35rem);
+  margin-bottom: var(--gap);
+}
+
+/* ---- controls ---- */
+input, select, textarea, button {
+  font: inherit;
+  color: inherit;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  padding: .6rem .75rem;
+  min-height: 44px; /* comfortable touch target */
+}
+textarea { min-height: 72px; resize: vertical; width: 100%; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+button { cursor: pointer; background: var(--panel-2); }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+button.sm { min-height: 34px; padding: .25rem .6rem; font-size: .85rem; }
+
+/* Search bar: stacks on phones, inline from 640px up. */
+.searchbar { display: grid; grid-template-columns: 1fr; gap: .6rem; }
+.searchbar input { width: 100%; }
+@media (min-width: 640px) {
+  .searchbar { grid-template-columns: 1fr auto auto; }
+}
+
+.tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: var(--gap); }
+.tabs button { background: var(--panel); }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+
+/* ---- feedback ---- */
+.alert {
+  border-radius: 10px;
+  padding: .7rem .9rem;
+  border: 1px solid;
+  margin: .5rem 0;
+  font-size: .92rem;
+}
+.alert.error { color: var(--danger); border-color: var(--danger); background: rgba(220, 38, 38, .08); }
+.alert.ok { color: var(--ok); border-color: var(--ok); background: rgba(5, 150, 105, .08); }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--panel-2), var(--line), var(--panel-2));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 10px;
+  height: 90px;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---- current conditions ---- */
+.now { display: grid; gap: var(--gap); grid-template-columns: 1fr; align-items: center; }
+@media (min-width: 720px) { .now { grid-template-columns: auto 1fr; } }
+
+.now-temp { font-size: clamp(3rem, 11vw, 4.75rem); font-weight: 700; line-height: 1; letter-spacing: -.04em; }
+.now-icon { font-size: clamp(3rem, 10vw, 4.5rem); line-height: 1; }
+
+/* Auto-fitting stat grid — the core responsive trick, no breakpoints needed. */
+.stats { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: .6rem .7rem; }
+.stat b { display: block; font-size: 1.1rem; }
+
+/* 5-day forecast: 5-up on desktop, wraps down to 1-up on phones. */
+.forecast { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.day {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+  padding: .8rem; text-align: center;
+}
+.day .icon { font-size: 2rem; }
+.day .hi { font-weight: 700; }
+.day .lo { color: var(--muted); }
+
+/* Hourly strip scrolls horizontally instead of squashing. */
+.hourly { display: flex; gap: .5rem; overflow-x: auto; padding-bottom: .4rem; scroll-snap-type: x mandatory; }
+.hour {
+  flex: 0 0 84px; scroll-snap-align: start; text-align: center;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: .5rem .25rem;
+  font-size: .82rem;
+}
+
+/* Tables scroll rather than break the page layout. */
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: .9rem; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; }
+
+.form-grid { display: grid; gap: .6rem; grid-template-columns: 1fr; }
+@media (min-width: 700px) { .form-grid { grid-template-columns: 2fr 1fr 1fr; } }
+
+.chips { display: flex; gap: .4rem; flex-wrap: wrap; }
+.chip { background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: .2rem .7rem; font-size: .8rem; }
+
+.two-col { display: grid; gap: var(--gap); grid-template-columns: 1fr; }
+@media (min-width: 900px) { .two-col { grid-template-columns: 1fr 1fr; } }
+
+iframe { width: 100%; border: 1px solid var(--line); border-radius: 10px; aspect-ratio: 16 / 10; }
+.videos { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+img { max-width: 100%; height: auto; border-radius: 10px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}

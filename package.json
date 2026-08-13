@@ -1,0 +1,19 @@
+{
+  "name": "weather-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-stack weather app - PM Accelerator AI Engineer Intern assessment (Tech Assessment #1 + #2)",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "node --test 'test/**/*.test.js'",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  }
+}

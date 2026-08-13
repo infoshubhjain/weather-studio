@@ -11,3 +11,6 @@ data/
 npm-debug.log*
 .playwright-mcp/
 shot-*.png
+
+# Local MCP wiring (machine-specific absolute paths)
+.mcp.json

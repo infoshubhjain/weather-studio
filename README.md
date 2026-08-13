@@ -112,7 +112,7 @@ Web-first, but it holds from 320px to ultrawide — verified at 390px and 1280px
 3. **Offline browser** → checked against `navigator.onLine`, shown as *"You appear to be offline."*
 4. **Geolocation denied / unavailable / timed out** → each `PositionError` code maps to its own next step.
 5. **Bad coordinates** → 400 *"Coordinates out of range."*
-6. **Partial failures degrade silently** → air quality, Wikipedia, country data and climate normals all return `null` rather than taking down the forecast (`Promise.allSettled`, not `all`).
+6. **Partial failures degrade silently** → air quality, Wikipedia and country data return `null` rather than taking down the forecast (`Promise.allSettled`, not `all`), and the climate baseline is a separate request that stays silent if it fails.
 
 ---
 
@@ -159,9 +159,17 @@ rather than adding a PDF dependency.
   (booleans only, never values). Returns 503 when degraded, so an uptime monitor can
   watch it.
 - **Per-IP rate limiting** on every public route.
-- **TTL cache with request coalescing** — concurrent callers for one key share a single
-  upstream request. Repeat lookup: 1.82s → 0.017s. This is what keeps the Location
-  Wallet inside Nominatim's ~1 req/sec usage policy.
+- **Two cache layers, because one wasn't enough.** In-process: a TTL cache with request
+  coalescing, so concurrent callers for one key share a single upstream request — this
+  is what keeps the Location Wallet inside Nominatim's ~1 req/sec usage policy. On top
+  of it: `Cache-Control: s-maxage` on `/api/weather`, `/api/normals` and `/api/discover`,
+  because a per-instance `Map` dies on every serverless cold start and isn't shared
+  between instances. The CDN layer is what actually makes a repeat lookup cheap in
+  production. Measured locally: **526ms cold, 2ms warm.**
+- **Nothing slow on the critical path.** The 15-year climate baseline costs 1.4–3.6s and
+  used to run *after* the forecast, so every search waited on an enrichment nobody had
+  asked for yet. It now lives at `GET /api/normals` and the client fetches it once the
+  forecast is drawn. Search latency dropped from ~3.9s to ~0.5s.
 - **Keys are server-side only.** Every secret is read inside a route handler; nothing is
   prefixed `NEXT_PUBLIC_`, so no key reaches the browser.
 
@@ -183,7 +191,7 @@ Locally, no configuration is needed — it writes `./data/weather.db` automatica
 
 ```bash
 npm test    # 9 offline suites — no network
-npm run smoke   # 19 end-to-end checks (needs a running server)
+npm run smoke   # 23 end-to-end checks (needs a running server)
 ```
 
 **Unit:** date-range edge cases including the Feb-30 rollover, id/notes validation,
@@ -194,7 +202,8 @@ weather→shader parameter mapping.
 
 **Smoke:** city / coordinate / landmark lookups, 404 and 400 paths, create → search →
 update → delete, weather refetch on date change, all five exports with download
-headers, and the Discover fan-out.
+headers, the Discover fan-out, and the climate-normals endpoint including its
+validation and its cache headers.
 
 Both suites pass. Manual probing also covered SQL injection (parameterised), XSS (React
 escaping), malformed JSON, oversized payloads, and rate-limit engagement.

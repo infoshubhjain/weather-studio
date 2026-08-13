@@ -16,10 +16,23 @@ export default function RecordsPanel({ unit, initialLocation = '' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
+  const touchedLocation = useRef(false);
   const [editing, setEditing] = useState(null); // { id, location, startDate, endDate, notes }
   const [openId, setOpenId] = useState(null);
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k) => (e) => {
+    if (k === 'location') touchedLocation.current = true;
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+  };
+
+  // This panel used to be unmounted whenever you left the tab, so it re-seeded
+  // its location field from the current search every time you came back. It
+  // stays mounted now, so keep that convenience explicitly — but never
+  // overwrite a location the user typed themselves.
+  useEffect(() => {
+    if (touchedLocation.current || !initialLocation) return;
+    setForm((f) => (f.location === initialLocation ? f : { ...f, location: initialLocation }));
+  }, [initialLocation]);
 
   async function load(q = search) {
     try {

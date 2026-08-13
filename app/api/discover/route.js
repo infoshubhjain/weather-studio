@@ -10,7 +10,7 @@
 //   - YouTube             : real search results with a key, links without
 import { resolveOne, reverseGeocode } from '@/lib/geo';
 import { rateLimit } from '@/lib/ratelimit';
-import { fail, ok } from '@/lib/http';
+import { fail, ok, cacheFor } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +66,7 @@ export async function GET(req) {
         directionsUrl: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`,
       },
       videos,
-    });
+    }, cacheFor(21_600));   // Wikipedia, country facts and POIs barely move — 6h
   } catch (e) {
     return fail(e);
   }

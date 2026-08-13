@@ -27,6 +27,31 @@ const NEUTRAL = {
   cloud: 0.35, day: 0, sunY: -0.2, storm: 0, precip: 0, kind: 'none',
 };
 
+/**
+ * Renders a tab's contents once it has been opened, then hides it with CSS
+ * instead of unmounting. Keeping the subtree alive is what makes going back to
+ * a tab instant: its state, and everything it already fetched, survives.
+ * `inert` keeps a hidden pane out of the tab order and away from screen
+ * readers, which `display: none` already does but is worth being explicit
+ * about for the keyboard path.
+ */
+function Pane({ id, tab, visited, children }) {
+  if (!visited.has(id)) return null;
+  const active = tab === id;
+  return (
+    <div
+      role="tabpanel"
+      id={`panel-${id}`}
+      aria-labelledby={`tab-${id}`}
+      hidden={!active}
+      inert={!active}
+      style={active ? undefined : { display: 'none' }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Home() {
   const [query, setQuery] = useState('');
   const [data, setData] = useState(null);
@@ -36,21 +61,56 @@ export default function Home() {
   const [tab, setTab] = useState('now');
   const [saved, setSaved] = useState(false);
   const bootstrapped = useRef(false);
+  // Bumped on every weather fetch. The climate-normals follow-up carries the
+  // value it started with, so a slow reply for a place the user has already
+  // navigated away from is discarded instead of overwriting the current one.
+  const fetchSeq = useRef(0);
+  // A tab is rendered from the first time it is opened and then only hidden,
+  // never unmounted. Unmounting threw away the panel's state, so every return
+  // to Discover re-ran its five-API fan-out and every return to Wallet
+  // re-fetched one request per saved card.
+  const [visited, setVisited] = useState(() => new Set(['now']));
   // Set as soon as the user does anything deliberate. The geolocation callback
   // can resolve seconds after boot — without this it silently overwrites a
   // search the user already typed, and their query just vanishes.
   const userActed = useRef(false);
 
+  /**
+   * The "is this normal for this date?" line. Split out of /api/weather
+   * because the 15-year archive lookup behind it costs seconds and the
+   * forecast should never wait on an enrichment — it arrives a moment later
+   * and fills itself in.
+   */
+  const fetchNormals = useCallback(async (body, seq) => {
+    const day = body.daily?.[0];
+    if (!day) return;
+    try {
+      const res = await fetch(`/api/normals?${new URLSearchParams({
+        lat: body.location.lat, lon: body.location.lon, date: day.date, tempMax: day.tempMax,
+      })}`);
+      if (!res.ok) return;                       // enrichment: stay silent
+      const { normal, anomaly } = await res.json();
+      if (!normal || !anomaly) return;
+      if (seq !== fetchSeq.current) return;      // a newer search already won
+      setData((d) => (d === body ? { ...d, climate: { normal, anomaly } } : d));
+    } catch {
+      /* enrichment only — a missing baseline must never surface as an error */
+    }
+  }, []);
+
   const fetchWeather = useCallback(async (params, label) => {
+    const seq = ++fetchSeq.current;
     setLoading(true);
     setError('');
     try {
       const res = await fetch(`/api/weather?${new URLSearchParams(params)}`);
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
+      if (seq !== fetchSeq.current) return null;
       setData(body);
       setSaved(hasPlace(body.location.lat, body.location.lon));
       if (label) localStorage.setItem('lastQuery', label);
+      fetchNormals(body, seq);                   // deliberately not awaited
       return body;
     } catch (e) {
       setError(navigator.onLine === false
@@ -60,7 +120,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchNormals]);
 
   /**
    * Boot order: your actual position first, because that is almost always what
@@ -106,12 +166,17 @@ export default function Home() {
     );
   }, [fetchWeather]);
 
+  const openTab = useCallback((id) => {
+    setVisited((v) => (v.has(id) ? v : new Set(v).add(id)));
+    setTab(id);
+  }, []);
+
   const search = (e) => {
     e?.preventDefault();
     const q = query.trim();
     if (!q) { setError('Enter a place to search for.'); return; }
     userActed.current = true;
-    setTab('now');
+    openTab('now');
     fetchWeather({ q }, q);
   };
 
@@ -120,7 +185,7 @@ export default function Home() {
     userActed.current = true;
     setLoading(true); setError('');
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => { setTab('now'); fetchWeather({ lat: coords.latitude, lon: coords.longitude }, null); },
+      ({ coords }) => { openTab('now'); fetchWeather({ lat: coords.latitude, lon: coords.longitude }, null); },
       (err) => {
         setLoading(false);
         setError({
@@ -148,7 +213,7 @@ export default function Home() {
   /** A parsed natural-language question drives the same code path as a search. */
   const handleParsed = (p) => {
     userActed.current = true;
-    setTab('now');
+    openTab('now');
     if (p.unit) { setUnit(p.unit); persistUnit(p.unit); }
     setQuery(p.location);
     fetchWeather({ q: p.location }, p.location);
@@ -156,7 +221,7 @@ export default function Home() {
 
   const pickPlace = (p) => {
     userActed.current = true;
-    setTab('now');
+    openTab('now');
     fetchWeather({ lat: p.lat, lon: p.lon }, p.name);
   };
 
@@ -203,12 +268,21 @@ export default function Home() {
 
         <nav className="tabs" role="tablist" aria-label="Sections">
           {TABS.map(([id, label]) => (
-            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
+            <button
+              key={id}
+              id={`tab-${id}`}
+              role="tab"
+              aria-selected={tab === id}
+              aria-controls={`panel-${id}`}
+              onClick={() => openTab(id)}
+            >
+              {label}
+            </button>
           ))}
         </nav>
 
-        {tab === 'now' && (
-          loading && !data ? (
+        <Pane id="now" tab={tab} visited={visited}>
+          {loading && !data ? (
             <>
               <div className="hero" />
               <div className="panel"><div className="skeleton" /></div>
@@ -221,16 +295,24 @@ export default function Home() {
               onSave={saveCurrent}
               onPickAlternative={(a) => fetchWeather({ lat: a.lat, lon: a.lon }, a.label)}
             />
-          ) : !error && <div className="panel"><p className="muted">Search for a place to begin.</p></div>
-        )}
+          ) : !error && <div className="panel"><p className="muted">Search for a place to begin.</p></div>}
+        </Pane>
 
-        {tab === 'wallet' && (
+        <Pane id="wallet" tab={tab} visited={visited}>
           <LocationWallet current={data?.location} unit={unit} onPick={pickPlace} />
-        )}
+        </Pane>
 
-        {tab === 'archive' && <RecordsPanel unit={unit} initialLocation={data?.location?.name ?? ''} />}
-        {tab === 'discover' && <DiscoverPanel query={data?.location?.name ?? ''} />}
-        {tab === 'about' && <About />}
+        <Pane id="archive" tab={tab} visited={visited}>
+          <RecordsPanel unit={unit} initialLocation={data?.location?.name ?? ''} />
+        </Pane>
+
+        <Pane id="discover" tab={tab} visited={visited}>
+          <DiscoverPanel query={data?.location?.name ?? ''} />
+        </Pane>
+
+        <Pane id="about" tab={tab} visited={visited}>
+          <About />
+        </Pane>
 
         <footer className="site">
           <p>

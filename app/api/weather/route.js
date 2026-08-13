@@ -1,11 +1,15 @@
 // GET /api/weather?q=Chicago            -> resolve + current + 5-day forecast
 // GET /api/weather?lat=..&lon=..         -> same, from coordinates (geolocation)
 // GET /api/weather?q=..&days=7           -> longer forecast
+//
+// Climate normals deliberately are NOT here — see app/api/normals/route.js.
+// They cost a 15-year archive fetch (measured 1.4-3.6s) and used to run
+// *after* the forecast, so every search paid for an enrichment nobody was
+// waiting on. The client fetches them separately once the forecast is drawn.
 import { geocode, reverseGeocode, LocationError } from '@/lib/geo';
 import { getWeather } from '@/lib/weather';
-import { climateNormal, describeAnomaly } from '@/lib/climate';
 import { rateLimit } from '@/lib/ratelimit';
-import { fail, ok } from '@/lib/http';
+import { fail, ok, cacheFor } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,18 +37,11 @@ export async function GET(req) {
 
     const weather = await getWeather({ lat: location.lat, lon: location.lon, days });
 
-    // "Is this normal?" — best-effort enrichment. `normals` is opt-out via
-    // ?normals=0 because it fans out to 15 archive years on a cold cache.
-    let climate = null;
-    if (p.get('normals') !== '0' && weather.daily?.[0]) {
-      const normal = await climateNormal({
-        lat: location.lat, lon: location.lon, date: weather.daily[0].date,
-      });
-      const anomaly = describeAnomaly(weather.daily[0], normal);
-      if (normal && anomaly) climate = { normal, anomaly };
-    }
-
-    return ok({ location, alternatives, climate, ...weather });
+    // Open-Meteo refreshes ~every 15 min, so a 10-minute edge cache never
+    // serves anything staler than the upstream already is. This is what makes
+    // a repeat lookup cheap in production: the in-process cache dies with each
+    // serverless instance, the CDN doesn't.
+    return ok({ location, alternatives, ...weather }, cacheFor(600));
   } catch (e) {
     return fail(e);
   }

@@ -125,6 +125,12 @@ It's also the single most useful thing for the traveller in the brief: a visitor
 no intuition for what a place is normally like in August, and that intuition is exactly
 what locals use to interpret a forecast.
 
+**Where it runs:** not on the forecast's critical path. The archive fetch measures
+1.4-3.6s, and the first version awaited it *inside* `/api/weather`, so every single
+search paid for it before rendering anything. It now has its own endpoint and the
+client asks for it after the forecast is on screen — the sentence appears a moment
+later, which is the right trade for a 3.9s → 0.5s search.
+
 **Engineering note:** the first implementation fired 15 parallel archive requests, one
 per year. Ten of them silently failed under throttling and the average was computed
 from five years while claiming to be robust. Rewritten as **one long-range request

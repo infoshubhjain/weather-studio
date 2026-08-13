@@ -52,6 +52,34 @@ await check('out-of-range coordinates return 400', async () => {
   expect(res.status === 400, `expected 400, got ${res.status}`);
 });
 
+await check('/api/weather is edge-cacheable and carries no climate payload', async () => {
+  const { res, body } = await call('/api/weather?q=Chicago');
+  expect(/s-maxage=\d+/.test(res.headers.get('cache-control') ?? ''), 'missing shared-cache header');
+  // Normals moved to /api/normals so the forecast never waits on them.
+  expect(!('climate' in body), 'climate should no longer ship with the forecast');
+});
+
+await check('GET /api/normals returns a baseline and an anomaly sentence', async () => {
+  const { res, body } = await call(`/api/normals?lat=41.88&lon=-87.63&date=${iso(0)}&tempMax=30`);
+  expect(res.ok, body.error);
+  expect(body.normal?.years >= 5, `expected a multi-year baseline, got ${JSON.stringify(body.normal)}`);
+  expect(typeof body.anomaly?.text === 'string', 'missing anomaly sentence');
+  expect(/s-maxage=\d+/.test(res.headers.get('cache-control') ?? ''), 'missing shared-cache header');
+});
+
+await check('GET /api/normals validates its inputs', async () => {
+  const bad = await call('/api/normals?lat=41.88&lon=-87.63&date=not-a-date');
+  expect(bad.res.status === 400, `expected 400 for a bad date, got ${bad.res.status}`);
+  const coords = await call(`/api/normals?lat=999&lon=0&date=${iso(0)}`);
+  expect(coords.res.status === 400, `expected 400 for bad coordinates, got ${coords.res.status}`);
+});
+
+await check('GET /api/normals omits the sentence when tempMax is absent', async () => {
+  const { res, body } = await call(`/api/normals?lat=41.88&lon=-87.63&date=${iso(0)}`);
+  expect(res.ok, body.error);
+  expect(body.anomaly === null, 'anomaly should be null without a tempMax to compare');
+});
+
 let id;
 await check('POST /api/records creates a record', async () => {
   const { res, body } = await call('/api/records', json('POST', {

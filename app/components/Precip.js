@@ -17,15 +17,21 @@ export default function Precip({ kind, intensity, wind = 0 }) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const ctx = canvas.getContext('2d');
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Rain is thin strokes over a blurred sky; rendering it at 3x on a retina
+    // display costs 2.25x the fill rate of 2x and looks identical.
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     let w = 0, h = 0, raf, running = true;
     let particles = [];
 
+    // Assigning canvas.width resets the backing store *and* the transform, so
+    // doing it unconditionally reallocated the buffer on every single frame.
+    // Only touch it when the size actually changed.
     const resize = () => {
-      w = canvas.clientWidth;
-      h = canvas.clientHeight;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
+      const cw = canvas.clientWidth, ch = canvas.clientHeight;
+      if (cw === w && ch === h) return;
+      w = cw; h = ch;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 

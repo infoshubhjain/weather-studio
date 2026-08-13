@@ -32,6 +32,10 @@ export default function Home() {
   const [tab, setTab] = useState('now');
   const [saved, setSaved] = useState(false);
   const bootstrapped = useRef(false);
+  // Set as soon as the user does anything deliberate. The geolocation callback
+  // can resolve seconds after boot — without this it silently overwrites a
+  // search the user already typed, and their query just vanishes.
+  const userActed = useRef(false);
 
   const fetchWeather = useCallback(async (params, label) => {
     setLoading(true);
@@ -66,6 +70,7 @@ export default function Home() {
     setUnit(getUnit());
 
     const fallback = () => {
+      if (userActed.current) return null;   // the user already chose; don't fight them
       const wallet = getWallet();
       if (wallet.length) return fetchWeather({ lat: wallet[0].lat, lon: wallet[0].lon }, wallet[0].name);
       const last = localStorage.getItem('lastQuery');
@@ -83,6 +88,9 @@ export default function Home() {
       ({ coords }) => {
         if (settled) return;
         settled = true; clearTimeout(timer);
+        // The permission prompt can sit open for a long time. If the user got
+        // bored and searched for somewhere in the meantime, that wins.
+        if (userActed.current) return;
         fetchWeather({ lat: coords.latitude, lon: coords.longitude }, null);
       },
       () => {
@@ -98,12 +106,14 @@ export default function Home() {
     e?.preventDefault();
     const q = query.trim();
     if (!q) { setError('Enter a place to search for.'); return; }
+    userActed.current = true;
     setTab('now');
     fetchWeather({ q }, q);
   };
 
   const useMyLocation = () => {
     if (!navigator.geolocation) { setError('This browser has no geolocation. Type a place instead.'); return; }
+    userActed.current = true;
     setLoading(true); setError('');
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => { setTab('now'); fetchWeather({ lat: coords.latitude, lon: coords.longitude }, null); },
@@ -131,7 +141,11 @@ export default function Home() {
     setSaved(true);
   };
 
-  const pickPlace = (p) => { setTab('now'); fetchWeather({ lat: p.lat, lon: p.lon }, p.name); };
+  const pickPlace = (p) => {
+    userActed.current = true;
+    setTab('now');
+    fetchWeather({ lat: p.lat, lon: p.lon }, p.name);
+  };
 
   const sky = data ? skyParams(data, data.location) : NEUTRAL;
   const fallbackSky = data ? skyGradient(data, data.location) : 'linear-gradient(170deg,#0a0d16,#070a13)';

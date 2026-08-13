@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { showTemp } from '@/lib/advice';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -34,6 +34,15 @@ export default function RecordsPanel({ unit, initialLocation = '' }) {
   }
 
   useEffect(() => { load(''); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  // Without this, every keystroke fired its own request — so typing "chicago"
+  // sent seven, and they could land out of order and show stale results.
+  const searchTimer = useRef(null);
+  const debouncedLoad = (q) => {
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => load(q), 250);
+  };
+  useEffect(() => () => clearTimeout(searchTimer.current), []);
 
   async function send(url, options, successMsg) {
     setBusy(true); setError(''); setOkMsg('');
@@ -115,7 +124,7 @@ export default function RecordsPanel({ unit, initialLocation = '' }) {
             <input
               placeholder="Search label, query, or notes"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); load(e.target.value); }}
+              onChange={(e) => { setSearch(e.target.value); debouncedLoad(e.target.value); }}
               aria-label="Search records"
             />
             <span className="muted">Export:</span>

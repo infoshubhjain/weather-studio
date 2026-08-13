@@ -21,16 +21,16 @@ export default function DiscoverPanel({ query }) {
     return () => { cancelled = true; };
   }, [query]);
 
-  if (!query) return <div className="card"><p className="muted">Search for a location first — this tab enriches whatever you looked up.</p></div>;
-  if (error) return <div className="card"><div className="alert error" role="alert">⚠️ {error}</div></div>;
-  if (!data) return <div className="card"><div className="skeleton" /></div>;
+  if (!query) return <div className="panel"><p className="muted">Search for a location first — this tab enriches whatever you looked up.</p></div>;
+  if (error) return <div className="panel"><div className="alert error" role="alert">⚠️ {error}</div></div>;
+  if (!data) return <div className="panel"><div className="skeleton" /></div>;
 
   const { wikipedia, nearby, country, map, videos, location } = data;
 
   return (
     <>
       <div className="two-col">
-        <section className="card">
+        <section className="panel">
           <h2>Map</h2>
           <iframe src={map.embedUrl} title={`Map of ${location.label}`} loading="lazy" />
           <div className="row" style={{ marginTop: '.6rem' }}>
@@ -40,7 +40,7 @@ export default function DiscoverPanel({ query }) {
           </div>
         </section>
 
-        <section className="card">
+        <section className="panel">
           <h2>About {location.name}</h2>
           {wikipedia ? (
             <>
@@ -65,7 +65,7 @@ export default function DiscoverPanel({ query }) {
       </div>
 
       {nearby.length > 0 && (
-        <section className="card">
+        <section className="panel">
           <h2>Nearby points of interest</h2>
           <div className="chips">
             {nearby.map((n) => (
@@ -77,7 +77,7 @@ export default function DiscoverPanel({ query }) {
         </section>
       )}
 
-      <section className="card">
+      <section className="panel">
         <h2>Videos</h2>
         {videos.items.length ? (
           <div className="videos">

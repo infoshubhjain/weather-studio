@@ -12,7 +12,8 @@ import { validateDateRange, validateId, validateNotes, ValidationError } from '.
 import { createRecord, getRecord, listRecords, updateRecord, deleteRecord } from '../lib/db.js';
 import { exportRecords } from '../lib/export.js';
 import { summarize } from '../lib/weather.js';
-import { advise, showTemp, showWind, feelsGap } from '../lib/advice.js';
+import { advise, showTemp, showWind, feelsGap, rankDays, ACTIVITIES } from '../lib/advice.js';
+import { skyParams, sunElevation } from '../lib/sky.js';
 
 const iso = (n) => new Date(Date.now() + n * 86400_000).toISOString().slice(0, 10);
 const throwsWith = (fn, re) => assert.throws(fn, (e) => e instanceof ValidationError && e.status === 400 && re.test(e.message));
@@ -130,4 +131,53 @@ test('advice reacts to conditions', () => {
   assert.match(tips, /Air quality is very poor/);
 
   assert.equal(advise({ current: { code: 0, temp: 18, feelsLike: 18 }, daily: [] }).length, 0);
+});
+
+test('best-day scoring ranks by what each activity needs', () => {
+  const days = [
+    { date: '2026-08-10', tempMax: 30, tempMin: 22, precipProb: 5,  windMax: 8,  uvMax: 9, daylightHours: 14 }, // hot & clear
+    { date: '2026-08-11', tempMax: 14, tempMin: 8,  precipProb: 10, windMax: 12, uvMax: 3, daylightHours: 13 }, // cool & clear
+    { date: '2026-08-12', tempMax: 22, tempMin: 15, precipProb: 95, windMax: 50, uvMax: 2, daylightHours: 13 }, // washout
+  ];
+
+  // A beach wants heat; a run wants cool. Same data, different winners.
+  assert.equal(rankDays(days, 'beach')[0].date, '2026-08-10');
+  assert.equal(rankDays(days, 'running')[0].date, '2026-08-11');
+
+  // The wet, windy day should never win anything.
+  for (const activity of Object.keys(ACTIVITIES)) {
+    assert.notEqual(rankDays(days, activity)[0].date, '2026-08-12', activity);
+  }
+
+  const scores = rankDays(days, 'outdoors');
+  assert.ok(scores.every((d) => d.score >= 0 && d.score <= 100), 'scores stay in range');
+  assert.ok(scores[0].score >= scores.at(-1).score, 'sorted best first');
+  assert.match(scores[0].verdict, /Excellent|Very good|Decent|Mediocre|Poor/);
+});
+
+test('sky mapping turns weather into render parameters', () => {
+  const at = (code, isDay, cloud) => skyParams(
+    { current: { code, isDay, cloudCover: cloud, time: '2026-08-10T13:00:00Z', precipitation: 0, snowfall: 0 } },
+    { lat: 40, lon: -88 },
+  );
+
+  assert.equal(at(0, 1, 0).day, 1);
+  assert.equal(at(0, 0, 0).day, 0);
+  assert.equal(at(95, 1, 90).storm, 1, 'thunderstorm code sets the storm flag');
+  assert.equal(at(71, 1, 90).kind, 'snow');
+  assert.equal(at(63, 1, 90).kind, 'rain');
+  assert.equal(at(0, 1, 0).kind, 'none');
+
+  // Overcast must read as cloudier than clear, and every colour stays 0..1
+  // or the shader renders garbage.
+  assert.ok(at(3, 1, 100).cloud > at(0, 1, 5).cloud);
+  for (const p of [at(0, 1, 0), at(95, 0, 100), at(75, 1, 60)]) {
+    assert.ok([...p.horizon, ...p.zenith].every((v) => v >= 0 && v <= 1), 'colour channels normalized');
+    assert.ok(p.cloud >= 0 && p.cloud <= 1 && p.precip >= 0 && p.precip <= 1);
+  }
+
+  // Solar elevation: noon UTC at the equator on the prime meridian is high;
+  // midnight is below the horizon.
+  assert.ok(sunElevation('2026-03-21T12:00:00Z', 0, 0) > 60);
+  assert.ok(sunElevation('2026-03-21T00:00:00Z', 0, 0) < -60);
 });

@@ -1,63 +1,112 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import WeatherPanel from './components/WeatherPanel';
 import RecordsPanel from './components/RecordsPanel';
 import DiscoverPanel from './components/DiscoverPanel';
+import LocationWallet from './components/LocationWallet';
+import SkyCanvas from './components/SkyCanvas';
+import Precip from './components/Precip';
+import { skyParams, skyGradient } from '@/lib/sky';
+import { addPlace, getWallet, hasPlace, getUnit, setUnit as persistUnit } from '@/lib/wallet';
 
 const TABS = [
-  ['weather', '🌤️ Weather'],
-  ['records', '🗂️ Saved records (CRUD)'],
-  ['discover', '🗺️ Discover'],
-  ['about', 'ℹ️ About'],
+  ['now', 'Now'],
+  ['wallet', 'Wallet'],
+  ['archive', 'Archive'],
+  ['discover', 'Discover'],
+  ['about', 'About'],
 ];
+
+const NEUTRAL = {
+  horizon: [0.07, 0.10, 0.18], zenith: [0.03, 0.04, 0.08],
+  cloud: 0.35, day: 0, sunY: -0.2, storm: 0, precip: 0, kind: 'none',
+};
 
 export default function Home() {
   const [query, setQuery] = useState('');
-  const [submitted, setSubmitted] = useState('');
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [unit, setUnit] = useState('C');
-  const [tab, setTab] = useState('weather');
+  const [tab, setTab] = useState('now');
+  const [saved, setSaved] = useState(false);
+  const bootstrapped = useRef(false);
 
   const fetchWeather = useCallback(async (params, label) => {
-    setLoading(true); setError(''); setData(null);
+    setLoading(true);
+    setError('');
     try {
       const res = await fetch(`/api/weather?${new URLSearchParams(params)}`);
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
       setData(body);
-      setSubmitted(label ?? body.location.name);
+      setSaved(hasPlace(body.location.lat, body.location.lon));
+      if (label) localStorage.setItem('lastQuery', label);
+      return body;
     } catch (e) {
-      // Covers both a real API error response and a dead network connection.
-      setError(navigator.onLine === false ? 'You appear to be offline. Reconnect and try again.' : e.message);
+      setError(navigator.onLine === false
+        ? 'You appear to be offline. Reconnect and try again.'
+        : e.message);
+      return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Remember the last place across reloads — nobody wants to retype it.
+  /**
+   * Boot order: your actual position first, because that is almost always what
+   * you want. If permission is denied or unavailable we fall back to the first
+   * place in your wallet, then your last search, then a sensible default —
+   * so the page is never empty and never blocks on a permission dialog.
+   */
   useEffect(() => {
-    const last = localStorage.getItem('lastQuery');
-    const u = localStorage.getItem('unit');
-    if (u) setUnit(u);
-    if (last) { setQuery(last); fetchWeather({ q: last }, last); }
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+    setUnit(getUnit());
+
+    const fallback = () => {
+      const wallet = getWallet();
+      if (wallet.length) return fetchWeather({ lat: wallet[0].lat, lon: wallet[0].lon }, wallet[0].name);
+      const last = localStorage.getItem('lastQuery');
+      if (last) { setQuery(last); return fetchWeather({ q: last }, last); }
+      return fetchWeather({ q: 'Chicago' }, null);
+    };
+
+    if (!navigator.geolocation) { fallback(); return; }
+
+    let settled = false;
+    // Don't leave the page loading forever if the user ignores the prompt.
+    const timer = setTimeout(() => { if (!settled) { settled = true; fallback(); } }, 9000);
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        if (settled) return;
+        settled = true; clearTimeout(timer);
+        fetchWeather({ lat: coords.latitude, lon: coords.longitude }, null);
+      },
+      () => {
+        if (settled) return;
+        settled = true; clearTimeout(timer);
+        fallback();
+      },
+      { timeout: 8000, maximumAge: 300_000 },
+    );
   }, [fetchWeather]);
 
   const search = (e) => {
     e?.preventDefault();
     const q = query.trim();
-    if (!q) { setError('Please enter a location to search.'); return; }
-    localStorage.setItem('lastQuery', q);
+    if (!q) { setError('Enter a place to search for.'); return; }
+    setTab('now');
     fetchWeather({ q }, q);
   };
 
   const useMyLocation = () => {
-    if (!navigator.geolocation) { setError('Your browser does not support geolocation. Type a location instead.'); return; }
+    if (!navigator.geolocation) { setError('This browser has no geolocation. Type a place instead.'); return; }
     setLoading(true); setError('');
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => fetchWeather({ lat: coords.latitude, lon: coords.longitude }, 'My location'),
+      ({ coords }) => { setTab('now'); fetchWeather({ lat: coords.latitude, lon: coords.longitude }, null); },
       (err) => {
         setLoading(false);
         setError({
@@ -70,78 +119,126 @@ export default function Home() {
     );
   };
 
-  const toggleUnit = () => setUnit((u) => { const n = u === 'C' ? 'F' : 'C'; localStorage.setItem('unit', n); return n; });
+  const toggleUnit = () => setUnit((u) => {
+    const next = u === 'C' ? 'F' : 'C';
+    persistUnit(next);
+    return next;
+  });
+
+  const saveCurrent = () => {
+    if (!data) return;
+    addPlace(data.location);
+    setSaved(true);
+  };
+
+  const pickPlace = (p) => { setTab('now'); fetchWeather({ lat: p.lat, lon: p.lon }, p.name); };
+
+  const sky = data ? skyParams(data, data.location) : NEUTRAL;
+  const fallbackSky = data ? skyGradient(data, data.location) : 'linear-gradient(170deg,#0a0d16,#070a13)';
 
   return (
-    <main className="wrap">
-      <header className="top">
-        <div className="spread">
-          <div>
-            <h1>🌤️ Weather Studio</h1>
-            <p className="muted" style={{ margin: 0 }}>
-              Built by <b>Shubh Jain</b> for the PM Accelerator AI Engineer Intern assessment (Tech Assessment #1 + #2).
-            </p>
+    <>
+      <SkyCanvas params={sky} fallback={fallbackSky} />
+      <Precip kind={sky.kind} intensity={sky.precip} wind={data?.current?.windSpeed ?? 0} />
+
+      <main className="shell">
+        <header className="masthead">
+          <div className="brand">
+            <div className="brand-mark" aria-hidden="true" />
+            <div>
+              <h1>Weather Studio</h1>
+              <p>Shubh Jain · PM Accelerator assessment</p>
+            </div>
           </div>
-          <button onClick={toggleUnit} aria-label="Toggle temperature units">Show °{unit === 'C' ? 'F' : 'C'}</button>
-        </div>
-      </header>
+          <div className="row">
+            <button onClick={toggleUnit} aria-label={`Switch to degrees ${unit === 'C' ? 'Fahrenheit' : 'Celsius'}`}>
+              °C / °F
+            </button>
+          </div>
+        </header>
 
-      <form className="card searchbar" onSubmit={search} role="search">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="City, town, postal code, landmark, or 41.88,-87.63"
-          aria-label="Location"
-          autoComplete="off"
-        />
-        <button className="primary" disabled={loading}>{loading ? 'Loading…' : 'Get weather'}</button>
-        <button type="button" onClick={useMyLocation} disabled={loading}>📍 Use my location</button>
-      </form>
+        <form className="searchbar" onSubmit={search} role="search">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="City, postal code, landmark, or 41.88,-87.63"
+            aria-label="Search for a location"
+            autoComplete="off"
+          />
+          <button className="primary" disabled={loading}>{loading ? 'Loading…' : 'Search'}</button>
+          <button type="button" onClick={useMyLocation} disabled={loading}>Use my location</button>
+        </form>
 
-      {error && <div className="alert error" role="alert">⚠️ {error}</div>}
+        {error && <div className="alert error" role="alert"><span aria-hidden="true">⚠</span><span>{error}</span></div>}
 
-      <nav className="tabs" role="tablist">
-        {TABS.map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
-        ))}
-      </nav>
+        <nav className="tabs" role="tablist" aria-label="Sections">
+          {TABS.map(([id, label]) => (
+            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>
+          ))}
+        </nav>
 
-      {tab === 'weather' && (
-        loading ? <div className="card"><div className="skeleton" /></div>
-        : data ? <WeatherPanel data={data} unit={unit} onPickAlternative={(a) => fetchWeather({ lat: a.lat, lon: a.lon }, a.label)} />
-        : !error && <div className="card"><p className="muted">Search a location above, or use your current position.</p></div>
-      )}
+        {tab === 'now' && (
+          loading && !data ? (
+            <>
+              <div className="hero" />
+              <div className="panel"><div className="skeleton" /></div>
+            </>
+          ) : data ? (
+            <WeatherPanel
+              data={data}
+              unit={unit}
+              saved={saved}
+              onSave={saveCurrent}
+              onPickAlternative={(a) => fetchWeather({ lat: a.lat, lon: a.lon }, a.label)}
+            />
+          ) : !error && <div className="panel"><p className="muted">Search for a place to begin.</p></div>
+        )}
 
-      {tab === 'records' && <RecordsPanel unit={unit} initialLocation={submitted} />}
-      {tab === 'discover' && <DiscoverPanel query={submitted} />}
-      {tab === 'about' && <About />}
+        {tab === 'wallet' && (
+          <LocationWallet current={data?.location} unit={unit} onPick={pickPlace} />
+        )}
 
-      <footer className="muted" style={{ marginTop: '1.5rem' }}>
-        Data: Open-Meteo (forecast, archive, air quality) · Open-Meteo Geocoding · OpenStreetMap Nominatim ·
-        Wikipedia REST &amp; GeoSearch · World Bank · flagcdn · YouTube.
-      </footer>
-    </main>
+        {tab === 'archive' && <RecordsPanel unit={unit} initialLocation={data?.location?.name ?? ''} />}
+        {tab === 'discover' && <DiscoverPanel query={data?.location?.name ?? ''} />}
+        {tab === 'about' && <About />}
+
+        <footer className="site">
+          <p>
+            <b>Data</b> — Open-Meteo (forecast · historical archive · air quality · geocoding) ·
+            OpenStreetMap Nominatim · Wikipedia REST &amp; GeoSearch · World Bank · flagcdn · YouTube.
+            All keyless.
+          </p>
+          <p>
+            <b>Rendering</b> — the sky is a hand-written WebGL fragment shader driven by live cloud cover,
+            solar elevation and condition code; precipitation is a canvas particle layer scaled to measured
+            rainfall. No 3D library.
+          </p>
+        </footer>
+      </main>
+    </>
   );
 }
 
 function About() {
   return (
-    <section className="card">
-      <h2>About this project</h2>
-      <p><b>Author:</b> Shubh Jain — shubhj3@illinois.edu</p>
+    <section className="panel">
+      <p className="eyebrow">About</p>
+      <h2 style={{ marginBottom: '.75rem' }}>Weather Studio</h2>
+      <p><b>Shubh Jain</b> — shubhj3@illinois.edu</p>
       <p>
-        A full-stack weather app covering both halves of the assessment: a responsive React/Next.js frontend
-        (Assessment #1) and a REST API with SQLite persistence, CRUD, validation and multi-format export
-        (Assessment #2).
+        A full-stack weather app covering both halves of the PM Accelerator AI Engineer Intern
+        assessment: a responsive React/Next.js frontend (Assessment #1) and a REST API with SQLite
+        persistence, full CRUD, validation and five export formats (Assessment #2).
       </p>
-      <h3>About PM Accelerator</h3>
+
+      <h3 style={{ margin: '1.5rem 0 .5rem' }}>Product Manager Accelerator</h3>
       <p>
-        The Product Manager Accelerator Program is designed to support PM professionals through every stage of
-        their careers. From students looking for entry-level jobs to Directors seeking to take on a leadership
-        role, PMA has helped hundreds of students fulfill their career aspirations. Its mission is to make
-        product management accessible: hands-on training, real-world projects, resume and interview coaching,
-        and a community of product leaders who guide members from their first PM role through to senior
-        leadership.
+        The Product Manager Accelerator Program is designed to support PM professionals through every
+        stage of their careers. From students looking for entry-level jobs to Directors seeking to take
+        on a leadership role, PMA has helped hundreds of students fulfill their career aspirations. Its
+        mission is to make product management accessible: hands-on training, real-world projects, resume
+        and interview coaching, and a community of product leaders who guide members from their first PM
+        role through to senior leadership.
       </p>
       <p>
         <a href="https://www.linkedin.com/school/pmaccelerator/" target="_blank" rel="noreferrer">

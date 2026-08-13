@@ -77,7 +77,7 @@ export default function RecordsPanel({ unit, initialLocation = '' }) {
 
   return (
     <>
-      <section className="card">
+      <section className="panel">
         <h2>Save a weather record</h2>
         <p className="muted">
           Enter any location — city, postal code, landmark, or <code>lat,lon</code> — plus a date range.
@@ -108,7 +108,7 @@ export default function RecordsPanel({ unit, initialLocation = '' }) {
         {okMsg && <div className="alert ok" role="status">✅ {okMsg}</div>}
       </section>
 
-      <section className="card">
+      <section className="panel">
         <div className="spread">
           <h2 style={{ margin: 0 }}>Saved records ({total})</h2>
           <div className="row">
@@ -169,9 +169,9 @@ export default function RecordsPanel({ unit, initialLocation = '' }) {
                 {r.weather.map((d) => (
                   <div className="day" key={d.date}>
                     <div>{d.date}</div>
-                    <div className="icon" role="img" aria-label={d.label}>{d.icon}</div>
+                    <div className="day-ico" role="img" aria-label={d.label}>{d.icon}</div>
                     <div style={{ fontSize: '.85rem' }}>{d.label}</div>
-                    <div><span className="hi">{showTemp(d.tempMax, unit)}</span> <span className="lo">{showTemp(d.tempMin, unit)}</span></div>
+                    <div><span className="day-hi">{showTemp(d.tempMax, unit)}</span> <span className="day-lo">{showTemp(d.tempMin, unit)}</span></div>
                     <div className="muted" style={{ fontSize: '.8rem' }}>💧 {d.precipSum ?? 0} mm</div>
                   </div>
                 ))}
@@ -186,7 +186,7 @@ export default function RecordsPanel({ unit, initialLocation = '' }) {
       </section>
 
       {editing && (
-        <section className="card">
+        <section className="panel">
           <h2>Editing record #{editing.id}</h2>
           <p className="muted">Changing the location or dates re-validates the input and re-fetches the weather, so a stored record can never go stale.</p>
           <form onSubmit={saveEdit}>

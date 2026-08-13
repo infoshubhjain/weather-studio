@@ -36,7 +36,7 @@ export async function GET() {
 
   return Response.json(
     {
-      status: healthy ? 'ok' : 'degraded',
+      status: !healthy ? 'degraded' : db.warning ? 'ok-ephemeral' : 'ok',
       uptimeSeconds: Math.round((Date.now() - started) / 1000),
       checkedAt: new Date().toISOString(),
       database: db,

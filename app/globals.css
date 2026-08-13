@@ -882,3 +882,67 @@ footer.site {
   .now-temp, .now-cond, .now-feels, .hero-place,
   .hero-sub, .headline, .forecast .day { animation: none !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   About / colophon
+   ═══════════════════════════════════════════════════════════════════════════ */
+.about-lede {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+  font-weight: 400;
+  letter-spacing: -.02em;
+  line-height: 1.35;
+  margin-bottom: 1rem;
+  max-width: 32ch;
+}
+.about-sub {
+  margin: 1.6rem 0 .7rem;
+  font-size: .7rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 500;
+}
+.about-list { margin: 0; padding-left: 1.1rem; display: grid; gap: .5rem; font-size: .9rem; color: var(--ink-dim); }
+.about-list b { color: var(--ink); font-weight: 600; }
+
+/* Link cards — auto-fit so the row reflows to 1-up on a phone with no
+   breakpoint, and the grid stays correct however many links are configured. */
+.linkgrid { display: grid; gap: .55rem; grid-template-columns: repeat(auto-fit, minmax(206px, 1fr)); }
+
+.linkcard {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .7rem .85rem;
+  border-radius: 14px;
+  text-decoration: none;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--line-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
+  transition: transform .35s var(--ease), background .35s var(--ease), border-color .35s var(--ease);
+}
+.linkcard:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, .085);
+  border-color: rgba(127, 179, 255, .4);
+}
+.linkcard svg { width: 20px; height: 20px; flex: none; color: var(--ink-dim); transition: color .35s var(--ease); }
+.linkcard:hover svg { color: #9ec5ff; }
+.linkcard span { display: flex; flex-direction: column; min-width: 0; }
+.linkcard b { font-size: .88rem; font-weight: 600; }
+.linkcard small {
+  font-size: .74rem; color: var(--ink-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.linkcard-go {
+  margin-left: auto; flex: none;
+  color: var(--ink-mute); font-size: .85rem;
+  transition: transform .35s var(--ease), color .35s var(--ease);
+}
+.linkcard:hover .linkcard-go { transform: translate(2px, -2px); color: #9ec5ff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .linkcard, .linkcard svg, .linkcard-go { transition: none; }
+  .linkcard:hover { transform: none; }
+}

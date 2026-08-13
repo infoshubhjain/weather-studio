@@ -8,6 +8,7 @@ import LocationWallet from './components/LocationWallet';
 import AskBox from './components/AskBox';
 import Logo from './components/Logo';
 import CursorGlow from './components/CursorGlow';
+import About from './components/About';
 import SkyCanvas from './components/SkyCanvas';
 import Precip from './components/Precip';
 import { skyParams, skyGradient } from '@/lib/sky';
@@ -245,35 +246,5 @@ export default function Home() {
         </footer>
       </main>
     </>
-  );
-}
-
-function About() {
-  return (
-    <section className="panel">
-      <p className="eyebrow">About</p>
-      <h2 style={{ marginBottom: '.75rem' }}>Weather Studio</h2>
-      <p><b>Shubh Jain</b> — shubhj3@illinois.edu</p>
-      <p>
-        A full-stack weather app covering both halves of the PM Accelerator AI Engineer Intern
-        assessment: a responsive React/Next.js frontend (Assessment #1) and a REST API with SQLite
-        persistence, full CRUD, validation and five export formats (Assessment #2).
-      </p>
-
-      <h3 style={{ margin: '1.5rem 0 .5rem' }}>Product Manager Accelerator</h3>
-      <p>
-        The Product Manager Accelerator Program is designed to support PM professionals through every
-        stage of their careers. From students looking for entry-level jobs to Directors seeking to take
-        on a leadership role, PMA has helped hundreds of students fulfill their career aspirations. Its
-        mission is to make product management accessible: hands-on training, real-world projects, resume
-        and interview coaching, and a community of product leaders who guide members from their first PM
-        role through to senior leadership.
-      </p>
-      <p>
-        <a href="https://www.linkedin.com/school/pmaccelerator/" target="_blank" rel="noreferrer">
-          Product Manager Accelerator on LinkedIn →
-        </a>
-      </p>
-    </section>
   );
 }

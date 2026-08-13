@@ -6,6 +6,8 @@ import RecordsPanel from './components/RecordsPanel';
 import DiscoverPanel from './components/DiscoverPanel';
 import LocationWallet from './components/LocationWallet';
 import AskBox from './components/AskBox';
+import Logo from './components/Logo';
+import CursorGlow from './components/CursorGlow';
 import SkyCanvas from './components/SkyCanvas';
 import Precip from './components/Precip';
 import { skyParams, skyGradient } from '@/lib/sky';
@@ -29,7 +31,7 @@ export default function Home() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [unit, setUnit] = useState('C');
+  const [unit, setUnit] = useState('F');   // see lib/wallet.js getUnit()
   const [tab, setTab] = useState('now');
   const [saved, setSaved] = useState(false);
   const bootstrapped = useRef(false);
@@ -164,11 +166,12 @@ export default function Home() {
     <>
       <SkyCanvas params={sky} fallback={fallbackSky} />
       <Precip kind={sky.kind} intensity={sky.precip} wind={data?.current?.windSpeed ?? 0} />
+      <CursorGlow />
 
       <main className="shell">
         <header className="masthead">
           <div className="brand">
-            <div className="brand-mark" aria-hidden="true" />
+            <Logo size={38} />
             <div>
               <h1>Weather Studio</h1>
               <p>Shubh Jain · PM Accelerator assessment</p>

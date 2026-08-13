@@ -139,16 +139,56 @@ a:hover { text-decoration-color: currentColor; }
   position: relative;
 }
 
+/* Liquid glass.
+   Real glass has three cues a flat blur misses: a bright specular edge where
+   light catches the top lip, a soft inner shade at the bottom where it falls
+   away, and a faint sheen across the surface. All three are box-shadow and
+   gradient work — no extra elements, no images. */
 .panel {
-  background: var(--glass);
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.028) 42%, rgba(255,255,255,.045)),
+    var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   padding: var(--pad);
   margin-bottom: var(--gap);
-  box-shadow: var(--shadow);
+  /* Keeps each panel's repaint inside its own box. Without this, a repaint in
+     one glass panel invalidates the shared backdrop for all of them. */
+  contain: paint;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16),      /* top specular lip */
+    inset 0 -1px 0 rgba(0, 0, 0, .28),           /* bottom falloff */
+    var(--shadow);
+  overflow: hidden;
+  transition: border-color .5s var(--ease), transform .5s var(--ease);
 }
+
+/* A slow diagonal sheen drifting across the glass — the "liquid" cue.
+   Sits behind content and never intercepts clicks. */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.07) 50%, transparent 58%);
+  transform: translateX(-38%);
+  opacity: 0;
+  pointer-events: none;
+}
+/* On hover only: at most one panel animates at a time, so the backdrop
+   recompute cost is paid once instead of seven times per frame. */
+.panel:hover::before {
+  opacity: 1;
+  animation: sheen 1.6s var(--ease);
+}
+@keyframes sheen {
+  from { transform: translateX(-38%); }
+  to   { transform: translateX(38%); }
+}
+.panel > * { position: relative; z-index: 1; }
+.panel:hover { border-color: rgba(255, 255, 255, .16); }
 
 .panel-head {
   display: flex;
@@ -191,12 +231,20 @@ a:hover { text-decoration-color: currentColor; }
   display: grid;
   grid-template-columns: 1fr;
   gap: .55rem;
-  background: var(--glass-strong);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.035)),
+    var(--glass-strong);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: .55rem;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 10px 34px rgba(0,0,0,.3);
+  transition: box-shadow .45s var(--ease), border-color .45s var(--ease);
+}
+.searchbar:focus-within {
+  border-color: rgba(127, 179, 255, .45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 4px rgba(57,135,229,.12), 0 12px 40px rgba(0,0,0,.34);
 }
 @media (min-width: 700px) { .searchbar { grid-template-columns: 1fr auto auto; } }
 
@@ -441,7 +489,7 @@ button.danger { color: var(--danger); border-color: rgba(230, 103, 103, .4); bac
   background: rgba(255, 255, 255, .05);
   border: 1px solid var(--line-soft);
 }
-.pill[aria-selected="true"] {
+.pill[aria-pressed="true"] {
   background: rgba(57, 135, 229, .2);
   border-color: rgba(127, 179, 255, .55);
   color: #cfe0ff;
@@ -557,11 +605,14 @@ button.danger { color: var(--danger); border-color: rgba(230, 103, 103, .4); bac
   gap: .25rem;
   padding: .3rem;
   margin-bottom: var(--gap);
-  background: var(--glass);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)),
+    var(--glass);
   border: 1px solid var(--line-soft);
   border-radius: 14px;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(26px) saturate(170%);
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
   overflow-x: auto;
 }
 .tabs button {
@@ -703,3 +754,131 @@ footer.site {
 }
 .anomaly.notable  { border-left-color: var(--warn);   background: rgba(237, 161, 0, .08); }
 .anomaly.extreme  { border-left-color: var(--danger); background: rgba(230, 103, 103, .1); color: #ffd9d9; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Logo
+   ═══════════════════════════════════════════════════════════════════════════ */
+.logo {
+  display: block;
+  flex: none;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(41, 98, 255, .34);
+}
+.lg-ring    { fill: none; stroke: #fff; stroke-opacity: .14; }
+.lg-arc     { fill: none; stroke: #cfe0ff; stroke-opacity: .55; stroke-width: 2; stroke-linecap: round; }
+.lg-horizon { stroke: #cfe0ff; stroke-opacity: .4; stroke-width: 1.5; }
+.lg-edge    { fill: none; stroke: rgba(255, 255, 255, .22); }
+
+/* The sun walks the arc: offset-path traces the same curve the <path> draws,
+   so the motion is exactly the daylight arc rather than an approximation. */
+.lg-sun-travel {
+  offset-path: path('M8 46 A24 24 0 0 1 56 46');
+  offset-rotate: 0deg;
+  offset-distance: 72%;
+}
+.logo-live .lg-sun-travel { animation: sun-walk 16s ease-in-out infinite; }
+@keyframes sun-walk {
+  0%, 100% { offset-distance: 12%; }
+  50%      { offset-distance: 88%; }
+}
+.logo-live .lg-ring { animation: ring-breathe 7s ease-in-out infinite; }
+@keyframes ring-breathe {
+  0%, 100% { stroke-opacity: .10; }
+  50%      { stroke-opacity: .22; }
+}
+/* Browsers without offset-path still get a correctly placed sun. */
+@supports not (offset-path: path('M0 0 L1 1')) {
+  .lg-sun-travel { transform: translate(44.9px, 29px); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Motion
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Ambient cursor light. A single fixed layer under the content, moved by CSS
+   variables — one paint per frame, no per-element work. */
+.cursor-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    460px circle at var(--cx, 50%) var(--cy, 30%),
+    rgba(127, 179, 255, .07), transparent 70%);
+  transition: opacity .6s var(--ease);
+}
+.shell { z-index: 1; }
+
+/* Hero entrance: the number lifts and settles, the label follows. */
+.now-temp   { animation: temp-in 1.1s var(--ease) both; }
+.now-cond   { animation: fade-up .8s var(--ease) .18s both; }
+.now-feels  { animation: fade-up .8s var(--ease) .26s both; }
+.hero-place { animation: fade-up .7s var(--ease) both; }
+.hero-sub   { animation: fade-up .7s var(--ease) .08s both; }
+.headline   { animation: fade-up .9s var(--ease) .34s both; }
+
+@keyframes temp-in {
+  from { opacity: 0; transform: translateY(28px) scale(.94); filter: blur(9px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Forecast cards arrive in sequence rather than all at once. */
+.forecast .day { animation: fade-up .7s var(--ease) both; }
+.forecast .day:nth-child(1) { animation-delay: .04s; }
+.forecast .day:nth-child(2) { animation-delay: .10s; }
+.forecast .day:nth-child(3) { animation-delay: .16s; }
+.forecast .day:nth-child(4) { animation-delay: .22s; }
+.forecast .day:nth-child(5) { animation-delay: .28s; }
+
+/* Wallet cards lift toward the pointer. */
+.wcard { will-change: transform; }
+
+/* Tab underline that slides instead of snapping. */
+.tabs button { position: relative; }
+.tabs button::after {
+  content: '';
+  position: absolute;
+  left: 50%; right: 50%; bottom: 5px;
+  height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, #3987e5, #7fb3ff);
+  transition: left .4s var(--ease), right .4s var(--ease);
+}
+.tabs button[aria-selected="true"]::after { left: 22%; right: 22%; }
+
+/* Buttons get a light sweep on hover. */
+.primary { position: relative; overflow: hidden; }
+.primary::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; left: -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.32), transparent);
+  transform: skewX(-18deg);
+  transition: left .65s var(--ease);
+}
+.primary:hover:not(:disabled)::after { left: 120%; }
+
+/* Chips and stats settle rather than jump. */
+.chip  { transition: background .3s var(--ease), transform .3s var(--ease), border-color .3s var(--ease); }
+.stat  { position: relative; overflow: hidden; }
+.stat::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(160px circle at 50% 0%, rgba(127,179,255,.16), transparent 70%);
+  opacity: 0; transition: opacity .4s var(--ease);
+  pointer-events: none;
+}
+.stat:hover::after { opacity: 1; }
+
+/* Everything above is decorative — motion preference switches it all off. */
+@media (prefers-reduced-motion: reduce) {
+  .panel::before,
+  .logo-live .lg-sun-travel,
+  .logo-live .lg-ring { animation: none !important; }
+  .cursor-glow { display: none; }
+  .now-temp, .now-cond, .now-feels, .hero-place,
+  .hero-sub, .headline, .forecast .day { animation: none !important; }
+}

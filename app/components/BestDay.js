@@ -24,12 +24,15 @@ export default function BestDay({ daily, unit }) {
     <section className="panel bestday">
       <header className="panel-head">
         <h2>Best day for…</h2>
-        <div className="pills" role="tablist" aria-label="Activity">
+        {/* A toggle-button group, not a tablist: these filter the panel below
+            rather than swapping panels, and role="tab" made screen readers
+            announce them alongside the page's real navigation tabs. */}
+        <div className="pills" role="group" aria-label="Choose an activity">
           {Object.entries(ACTIVITIES).map(([key, a]) => (
             <button
               key={key}
-              role="tab"
-              aria-selected={activity === key}
+              type="button"
+              aria-pressed={activity === key}
               className="pill"
               onClick={() => setActivity(key)}
             >

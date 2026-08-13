@@ -3,8 +3,16 @@
 // and the advice engine. Network-dependent code is exercised by the smoke
 // script (npm run smoke) instead of being mocked here.
 //
-//   node --test test/
-process.env.WEATHER_DB = ':memory:';
+//   npm test
+//
+// The in-memory database MUST be selected via the environment before this file
+// is loaded (see the `test` script in package.json). Setting process.env here
+// would be too late: ESM imports are hoisted and evaluated first, so lib/db.js
+// would already have connected — to the real ./data/weather.db. That bug made
+// the suite silently run against development data.
+if (process.env.WEATHER_DB !== ':memory:') {
+  throw new Error('Run the tests with `npm test` so WEATHER_DB=:memory: is set before imports.');
+}
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -51,8 +59,8 @@ test('summarize picks true extremes across the range', () => {
   assert.equal(s.days, 2);
 });
 
-test('CRUD round-trip', () => {
-  const made = createRecord({
+test('CRUD round-trip', async () => {
+  const made = await createRecord({
     query: 'Chicago', label: 'Chicago, Illinois, United States',
     latitude: 41.85, longitude: -87.65, country: 'United States',
     startDate: '2024-01-01', endDate: '2024-01-02', notes: 'trip',
@@ -60,29 +68,29 @@ test('CRUD round-trip', () => {
   });
 
   assert.ok(made.id > 0);
-  assert.equal(getRecord(made.id).label, made.label);
-  assert.deepEqual(getRecord(made.id).weather, days); // JSON survives the round-trip
+  assert.equal((await getRecord(made.id)).label, made.label);
+  assert.deepEqual((await getRecord(made.id)).weather, days); // JSON survives the round-trip
 
-  assert.equal(listRecords({ search: 'chicago' }).total, 1);
-  assert.equal(listRecords({ search: 'nowhere' }).total, 0);
+  assert.equal((await listRecords({ search: 'chicago' })).total, 1);
+  assert.equal((await listRecords({ search: 'nowhere' })).total, 0);
 
-  const updated = updateRecord(made.id, { notes: 'changed', label: 'Chicago, IL' });
+  const updated = await updateRecord(made.id, { notes: 'changed', label: 'Chicago, IL' });
   assert.equal(updated.notes, 'changed');
   assert.equal(updated.label, 'Chicago, IL');
-  assert.equal(updateRecord(999_999, { notes: 'x' }), null);
+  assert.equal(await updateRecord(999_999, { notes: 'x' }), null);
 
-  assert.equal(deleteRecord(made.id), true);
-  assert.equal(deleteRecord(made.id), false); // second delete is a no-op, not a crash
-  assert.equal(getRecord(made.id), undefined);
+  assert.equal(await deleteRecord(made.id), true);
+  assert.equal(await deleteRecord(made.id), false); // second delete is a no-op, not a crash
+  assert.equal(await getRecord(made.id), undefined);
 });
 
-test('exports produce well-formed output in every format', () => {
-  const r = createRecord({
+test('exports produce well-formed output in every format', async () => {
+  const r = await createRecord({
     query: 'x', label: 'Comma, "quoted" place', latitude: 1, longitude: 2, country: 'C',
     startDate: '2024-01-01', endDate: '2024-01-02', notes: 'a & b <tag>',
     summary: summarize(days), weather: days,
   });
-  const all = listRecords().records;
+  const all = (await listRecords()).records;
 
   assert.equal(JSON.parse(exportRecords(all, 'json')).count, all.length);
 
@@ -102,7 +110,7 @@ test('exports produce well-formed output in every format', () => {
   assert.match(pdf.toString('latin1'), /startxref\n\d+\n%%EOF/);
 
   assert.throws(() => exportRecords(all, 'docx'), /Unsupported format/);
-  deleteRecord(r.id);
+  await deleteRecord(r.id);
 });
 
 test('unit formatting', () => {

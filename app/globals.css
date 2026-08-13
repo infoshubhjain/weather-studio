@@ -661,3 +661,45 @@ footer.site {
   }
   .reveal { opacity: 1 !important; transform: none !important; }
 }
+
+/* ------------------------------------------------------ AI ask box + normals */
+.askbox { margin-bottom: var(--gap); }
+.ask-row { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+@media (min-width: 620px) { .ask-row { grid-template-columns: 1fr auto; } }
+
+.badge {
+  display: inline-block;
+  margin-left: .4rem;
+  padding: .05rem .4rem;
+  font-size: .58rem;
+  letter-spacing: .12em;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3987e5, #7fb3ff);
+  color: #04101f;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.ask-result {
+  margin: .6rem 0 0;
+  font-size: .85rem;
+  color: var(--ink-dim);
+  padding: .5rem .7rem;
+  border-radius: 10px;
+  background: rgba(57, 135, 229, .1);
+  border: 1px solid rgba(127, 179, 255, .28);
+}
+
+/* Climate anomaly — the "is this normal?" line under the headline. */
+.anomaly {
+  margin: .6rem 0 0;
+  font-size: .84rem;
+  line-height: 1.45;
+  color: var(--ink-dim);
+  padding: .45rem .7rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .05);
+  border-left: 2px solid var(--line);
+  max-width: 34ch;
+}
+.anomaly.notable  { border-left-color: var(--warn);   background: rgba(237, 161, 0, .08); }
+.anomaly.extreme  { border-left-color: var(--danger); background: rgba(230, 103, 103, .1); color: #ffd9d9; }

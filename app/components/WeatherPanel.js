@@ -38,7 +38,7 @@ const trackLight = (e) => {
 };
 
 export default function WeatherPanel({ data, unit, onPickAlternative, onSave, saved }) {
-  const { location, current, daily, hourly, airQuality, alternatives = [], timezone } = data;
+  const { location, current, daily, hourly, airQuality, alternatives = [], timezone, climate } = data;
   const tips = advise(data);
   const root = useReveal();
 
@@ -68,7 +68,14 @@ export default function WeatherPanel({ data, unit, onPickAlternative, onSave, sa
             </div>
             <p className="now-feels">Feels like {showTemp(current.feelsLike, unit)}</p>
           </div>
-          <p className="headline">{headline(current, daily)}</p>
+          <div>
+            <p className="headline">{headline(current, daily)}</p>
+            {climate && (
+              <p className={`anomaly ${climate.anomaly.level}`}>
+                <span aria-hidden="true">📊</span> {climate.anomaly.text}
+              </p>
+            )}
+          </div>
         </div>
       </section>
 

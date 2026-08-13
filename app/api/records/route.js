@@ -5,6 +5,7 @@ import { resolveOne } from '@/lib/geo';
 import { getRange, summarize } from '@/lib/weather';
 import { createRecord, listRecords } from '@/lib/db';
 import { validateDateRange, validateNotes, ValidationError } from '@/lib/validate';
+import { rateLimit } from '@/lib/ratelimit';
 import { fail, ok } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req) {
   try {
     const p = req.nextUrl.searchParams;
-    return ok(listRecords({
+    return ok(await listRecords({
       search: p.get('search') ?? '',
       limit: Math.min(Number(p.get('limit') ?? 100) || 100, 500),
       offset: Math.max(Number(p.get('offset') ?? 0) || 0, 0),
@@ -24,6 +25,10 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    // Writes are the expensive path: two upstream calls plus a DB insert.
+    const limited = rateLimit(req, { max: 20, windowMs: 60_000, key: 'records-write' });
+    if (limited) return limited;
+
     const body = await req.json().catch(() => {
       throw new ValidationError('Request body must be valid JSON.');
     });
@@ -39,7 +44,7 @@ export async function POST(req) {
     const days = await getRange({ lat: loc.lat, lon: loc.lon, start, end });
 
     return ok(
-      createRecord({
+      await createRecord({
         query, label: loc.label, latitude: loc.lat, longitude: loc.lon, country: loc.country,
         startDate: start, endDate: end, notes, summary: summarize(days), weather: days,
       }),

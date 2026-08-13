@@ -12,7 +12,7 @@ const notFound = (id) => Object.assign(new Error(`No record with id ${id}.`), { 
 export async function GET(_req, { params }) {
   try {
     const id = validateId((await params).id);
-    return ok(getRecord(id) ?? (() => { throw notFound(id); })());
+    return ok((await getRecord(id)) ?? (() => { throw notFound(id); })());
   } catch (e) {
     return fail(e);
   }
@@ -26,7 +26,7 @@ export async function GET(_req, { params }) {
 export async function PUT(req, { params }) {
   try {
     const id = validateId((await params).id);
-    const existing = getRecord(id);
+    const existing = await getRecord(id);
     if (!existing) throw notFound(id);
 
     const body = await req.json().catch(() => {
@@ -58,7 +58,7 @@ export async function PUT(req, { params }) {
     }
 
     if (!Object.keys(patch).length) throw new ValidationError('Nothing to update. Send location, startDate, endDate, or notes.');
-    return ok(updateRecord(id, patch));
+    return ok(await updateRecord(id, patch));
   } catch (e) {
     return fail(e);
   }
@@ -67,7 +67,7 @@ export async function PUT(req, { params }) {
 export async function DELETE(_req, { params }) {
   try {
     const id = validateId((await params).id);
-    if (!deleteRecord(id)) throw notFound(id);
+    if (!(await deleteRecord(id))) throw notFound(id);
     return ok({ deleted: id });
   } catch (e) {
     return fail(e);

@@ -5,6 +5,7 @@ import WeatherPanel from './components/WeatherPanel';
 import RecordsPanel from './components/RecordsPanel';
 import DiscoverPanel from './components/DiscoverPanel';
 import LocationWallet from './components/LocationWallet';
+import AskBox from './components/AskBox';
 import SkyCanvas from './components/SkyCanvas';
 import Precip from './components/Precip';
 import { skyParams, skyGradient } from '@/lib/sky';
@@ -141,6 +142,15 @@ export default function Home() {
     setSaved(true);
   };
 
+  /** A parsed natural-language question drives the same code path as a search. */
+  const handleParsed = (p) => {
+    userActed.current = true;
+    setTab('now');
+    if (p.unit) { setUnit(p.unit); persistUnit(p.unit); }
+    setQuery(p.location);
+    fetchWeather({ q: p.location }, p.location);
+  };
+
   const pickPlace = (p) => {
     userActed.current = true;
     setTab('now');
@@ -182,6 +192,8 @@ export default function Home() {
           <button className="primary" disabled={loading}>{loading ? 'Loading…' : 'Search'}</button>
           <button type="button" onClick={useMyLocation} disabled={loading}>Use my location</button>
         </form>
+
+        <AskBox onParsed={handleParsed} />
 
         {error && <div className="alert error" role="alert"><span aria-hidden="true">⚠</span><span>{error}</span></div>}
 

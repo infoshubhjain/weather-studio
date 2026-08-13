@@ -9,6 +9,7 @@
 //   - OpenStreetMap       : embeddable map + directions links
 //   - YouTube             : real search results with a key, links without
 import { resolveOne, reverseGeocode } from '@/lib/geo';
+import { rateLimit } from '@/lib/ratelimit';
 import { fail, ok } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,9 @@ const soft = async (url, init) => {
 
 export async function GET(req) {
   try {
+    const limited = rateLimit(req, { max: 30, windowMs: 60_000, key: 'discover' });
+    if (limited) return limited;
+
     const p = req.nextUrl.searchParams;
     const location = p.get('lat') && p.get('lon')
       ? await reverseGeocode(Number(p.get('lat')), Number(p.get('lon')))

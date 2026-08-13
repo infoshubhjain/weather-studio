@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 export default {
-  // node:sqlite is a builtin; keep it out of the server bundle.
-  serverExternalPackages: ['node:sqlite'],
+  // @libsql/client ships native bindings — keep it out of the bundler and let
+  // Node require it directly at runtime.
+  serverExternalPackages: ['@libsql/client'],
 };

@@ -7,6 +7,11 @@
 
 Author: **Shubh Jain** · shubhj3@illinois.edu
 
+### ▶ [Live demo — shubh-weather-studio.vercel.app](https://shubh-weather-studio.vercel.app)
+
+Deployed on Vercel. No sign-in, no API keys — it works the moment you open it.
+Health check: [`/api/health`](https://shubh-weather-studio.vercel.app/api/health)
+
 ---
 
 People don't open a weather app to learn a number — they open it to make a decision:
